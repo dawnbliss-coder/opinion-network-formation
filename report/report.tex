@@ -1,0 +1,160 @@
+% =============================================================
+% DPCN Assignment 1: Opinion Network Formation -- Report Template
+% Compile with: pdflatex report.tex  (run twice if you add refs/TOC)
+%
+% This is a SKELETON: headings/subheadings give the required
+% structure and direction; you fill in the actual content.
+% Section order below matches the assignment brief exactly --
+% do not reorder.
+%
+% Suggested page budget (target: ~8 pages total):
+%   1. Team Name                    ~0.25 page
+%   2. GitHub Link to Code          ~0.25 page
+%   3. Dataset Documentation        ~1    page
+%   4. Pipeline Followed            ~2    pages (subsections below)
+%   5. Analysis and Visualizations  ~2.5  pages (subsections below)
+%   6. Results and Discussion       ~1.5  pages
+%   7. Individual Contribution      ~0.5  page
+% Adjust as needed -- this is a guide, not a hard rule.
+% =============================================================
+\documentclass[11pt]{article}
+
+\usepackage[margin=1in]{geometry}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{caption}
+\usepackage{amsmath}
+\usepackage{enumitem}
+\usepackage{xcolor}
+\usepackage{hyperref}
+\hypersetup{colorlinks=true, linkcolor=blue, urlcolor=blue, citecolor=blue}
+
+% Short italic direction/guidance notes -- delete each one once
+% you've replaced it with real content.
+\newcommand{\guide}[1]{\textit{\textcolor{gray}{Guidance: #1}}\par}
+
+\setlength{\parskip}{0.5em}
+\setlength{\parindent}{0em}
+
+\title{\vspace{-1.5em}Opinion Network Formation\\
+\large Assignment 1 -- Team Name}
+\author{Member 1 \and Member 2 \and Member 3}
+\date{\today}
+
+\begin{document}
+\maketitle
+\vspace{-2em}
+
+% -----------------------------------------------------------------
+\section{Team Name}
+% -----------------------------------------------------------------
+\guide{State the team name and list members with roll numbers.}
+
+% -----------------------------------------------------------------
+\section{GitHub Link to Code}
+% -----------------------------------------------------------------
+\guide{Link to the repository, plus a one-line pointer to how it's organized
+(e.g., \texttt{src/} for pipeline code, \texttt{figures/} for outputs).
+Make sure the repo is accessible to graders.}
+
+% -----------------------------------------------------------------
+\section{Dataset Documentation}
+% -----------------------------------------------------------------
+
+\subsection{Data Description}
+\guide{What was collected, how many respondents/statements, what categories
+or themes the statements fall into.}
+
+\subsection{Encoding and Preprocessing}
+\guide{How raw survey responses were converted to a numeric/analyzable form
+(e.g., Likert-to-numeric mapping), and any other transformation applied
+before network construction.}
+
+\subsection{Handling Missing Data and Data Quality}
+\guide{How missing/skipped responses were treated, any filtering applied
+(e.g., dropping low-engagement respondents), and why.}
+
+% -----------------------------------------------------------------
+\section{Pipeline Followed}
+% -----------------------------------------------------------------
+\guide{Describe the network(s) you built and the step-by-step process for
+constructing each from the prepared data: what are the nodes, what defines
+an edge, how weights are computed, and how/why the graph was sparsified
+(if at all). One subsection per network.}
+
+\subsection{User--User Network}
+
+\subsection{Statement--Statement Network}
+
+\subsection{User--Statement Network}
+
+% -----------------------------------------------------------------
+\section{Analysis and Visualizations}
+% -----------------------------------------------------------------
+\guide{For each network: a figure, the key structural metrics (e.g., nodes,
+edges, density, degree/centrality measures, communities), and a short
+interpretation of what the numbers/figure show.}
+
+\subsection{User--User Network}
+
+% Example figure template -- update path/caption/label:
+% \begin{figure}[h]
+%     \centering
+%     \includegraphics[width=0.75\textwidth]{../figures/FIGURE_NAME.png}
+%     \caption{CAPTION}
+%     \label{fig:user-user}
+% \end{figure}
+
+% Example metrics table template -- fill in rows:
+% \begin{center}
+% \begin{tabular}{lc}
+% \toprule
+% \textbf{Metric} & \textbf{Value} \\
+% \midrule
+% Nodes & \\
+% Edges & \\
+% Density & \\
+% \bottomrule
+% \end{tabular}
+% \end{center}
+
+\subsection{Statement--Statement Network}
+
+\subsection{User--Statement Network}
+
+% -----------------------------------------------------------------
+\section{Results and Discussion}
+% -----------------------------------------------------------------
+\guide{Step back from individual networks and interpret what they reveal
+about the class's opinions overall. Suggested angles:}
+\begin{itemize}[nosep]
+    \item \textit{\textcolor{gray}{Overall opinion structure -- broad consensus vs.\ contested topics.}}
+    \item \textit{\textcolor{gray}{Cross-network agreement -- do findings from one network corroborate
+    or contradict another?}}
+    \item \textit{\textcolor{gray}{Notable/central respondents, statements, or communities, and what
+    they mean substantively.}}
+    \item \textit{\textcolor{gray}{Limitations of the approach and choices made (thresholds, filtering,
+    weighting scheme).}}
+\end{itemize}
+
+% -----------------------------------------------------------------
+\section{Individual Contribution}
+% -----------------------------------------------------------------
+\guide{Table or list mapping each member to the specific tasks they completed
+(this section is graded individually, so be specific and complete).}
+
+\begin{center}
+\begin{tabular}{p{3cm}p{10cm}}
+\toprule
+\textbf{Member} & \textbf{Contribution} \\
+\midrule
+Name 1 & \\
+\addlinespace
+Name 2 & \\
+\addlinespace
+Name 3 & \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\end{document}
