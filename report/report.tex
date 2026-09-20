@@ -208,9 +208,9 @@ Strongly Agree/Disagree only  & 2{,}349 & 45.0\% \\
     \centering
     \includegraphics[width=0.47\textwidth]{../figures/user_user_directed.png}\hfill
     \includegraphics[width=0.47\textwidth]{../figures/user_user_mutual.png}
-    \caption{\textit{Left:} Full Directed graph of top 8 similarity scores per user based on cosine similarity. 
+    \caption{\textit{Left:} Full Directed graph of top 8 similarity scores per user based on cosine similarity.
     \textit{Right:} Full graph of mutual top 8 similarity scores per user based on cosine similarity.}
-    \label{fig:user-statement}
+    \label{fig:user-user-viz}
 \end{figure}
 
 \textit{Topic-Specific Multiplex Layers.} To analyze how opinions
@@ -315,9 +315,40 @@ while a high std points to a polarizing or contested statement, regardless of it
 \end{tabular}
 \end{center}
 
-By these metrics, consensus statements (high mean, low std) include E15 and V13, while the most
-polarizing statements (high std) are E02, E03, and E04. It's worth noting that all three of the
-polarizing ones come from the Education category.
+For respondents, the extremes by these metrics are:
+
+\begin{center}
+\small
+\begin{tabular}{llcc}
+\toprule
+\textbf{Type} & \textbf{Respondent} & \textbf{mean\_response} & \textbf{mean\_abs\_response} \\
+\midrule
+Most agreeable & 41 & 1.77 & 1.87 \\
+Most agreeable & 94 & 1.75 & 1.82 \\
+Most disagreeable & 120 & $-0.21$ & 1.29 \\
+Most disagreeable & 119 & 0.27 & 0.47 \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+Respondent 120 is the only respondent whose average stance leans toward disagree overall. For
+statements, the strongest consensus and most polarizing cases by these metrics are:
+
+\begin{center}
+\small
+\begin{tabular}{llcc}
+\toprule
+\textbf{Type} & \textbf{Statement (category)} & \textbf{mean\_response} & \textbf{std\_response} \\
+\midrule
+Consensus & E15 (E) & 1.71 & 0.50 \\
+Consensus & V13 (V) & 1.67 & 0.56 \\
+Polarizing & E04 (E) & 0.44 & 1.17 \\
+Polarizing & E03 (E) & $-0.94$ & 1.12 \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+All three most polarizing statements (E02, E03, E04) come from the Education category.
 
 % -----------------------------------------------------------------
 \section{Results and Discussion}
@@ -356,8 +387,8 @@ broader class consensus.
 \textbf{Topic-driven factionalism.} While the class shows general consensus,
 factionalism spikes depending on the subject matter. Topics related to Technology
 (modularity 0.377, 5 communities) and Education (modularity 0.370, 7 communities)
-display significantly higher modularity -- meaning tighter, more distinct echo chambers
--- than Environment (0.299) or Society (0.313). This suggests that Tech and Education
+display significantly higher modularity, meaning tighter, more distinct echo chambers,
+than Environment (0.299) or Society (0.313). This suggests that Tech and Education
 statements are where the most distinct dividing lines in class opinion are drawn.
 
 \subsection{Statement--Statement Network}
@@ -371,10 +402,10 @@ answers were Agree or Strongly Agree.
 At the respondent level, mean\_response isolates a small set of genuine outliers from the agreeable
 majority. Respondent 120 has the lowest mean\_response ($-0.21$), the only respondent whose average
 stance falls on the disagreement side of neutral despite answering 56 of 60 statements. That looks
-like a real dissenting voice rather than a low-engagement artifact -- notably, this is the same
+like a real dissenting voice rather than a low-engagement artifact. Notably, this is the same
 respondent (120) flagged as the primary out-strength outlier in the User--User network
-(Section~6.1), corroborating across networks that respondent 120 is a genuine opinion outlier rather
-than an artifact of either method.
+(Section~6.1), corroborating across networks that respondent 120 is a genuine opinion outlier
+rather than an artifact of either method.
 
 At the statement level, std\_response identifies the Education-category statements E02, E03, and E04
 as the most contested in the entire survey, while E15 and V13 are the strongest consensus statements.
