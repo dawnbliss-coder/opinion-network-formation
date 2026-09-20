@@ -50,6 +50,7 @@
 
 \begin{itemize}[nosep]
     \item Shreyas Agarwal (Roll No.\ 2024101118)
+    \item Sarah Roomi (Roll No.\ 2024101033)
     \item Priyanka Agarwal (Roll No.\ 2024101016)
 \end{itemize}
 
@@ -154,6 +155,88 @@ distribution: positive threshold = 0.9 (exceptional similarity) and negative thr
 
 \subsection{Statement--Statement Network}
 
+\begin{figure}[h]
+\centering
+\begin{tikzpicture}[
+  block/.style={rectangle, draw, fill=gray!10, rounded corners, text width=2.15cm,
+                align=center, minimum height=1.15cm, font=\scriptsize},
+  arrow/.style={thick, -{Stealth[length=1.8mm]}}
+]
+% --- Row 1: shared preprocessing (data_prep.py) ---
+\node[block] (raw) {Raw responses\\($96\times 60$ Likert)};
+\node[block, right=0.3cm of raw] (encode) {Encode to\\$\{-2,\dots,2\}$,\\NaN if missing};
+\node[block, right=0.3cm of encode] (filter) {Drop resp.\ $<$50\%\\answered $\Rightarrow$\\87 respondents};
+\node[block, right=0.3cm of filter] (rescale) {Std-rescale\\per respondent\\(no mean shift)};
+
+% --- Row 2: Statement-Statement specific steps (statement_network.py) ---
+\node[block, below=0.55cm of raw, xshift=1.05cm] (corr) {Pairwise\\Spearman $r_{ij}$\\(min.\ 15 pairs)};
+\node[block, right=0.3cm of corr] (thresh) {Keep edge iff\\$|r_{ij}|\geq 0.30$\\(signed weight)};
+\node[block, right=0.3cm of thresh] (metrics) {Degree, eigenvector,\\betweenness\\centrality};
+\node[block, right=0.3cm of metrics] (viz) {Force-directed\\visualization\\(spring layout)};
+
+\draw[arrow] (raw) -- (encode);
+\draw[arrow] (encode) -- (filter);
+\draw[arrow] (filter) -- (rescale);
+\draw[arrow] (rescale.south) -- ++(0,-0.15) -| (corr.north);
+\draw[arrow] (corr) -- (thresh);
+\draw[arrow] (thresh) -- (metrics);
+\draw[arrow] (metrics) -- (viz);
+\end{tikzpicture}
+\caption{Statement--Statement network construction pipeline.}
+\label{fig:statement-pipeline}
+\end{figure}
+
+This network flips the viewpoint of the User--User graph: instead of asking which
+\emph{respondents} answered alike, it asks which \emph{statements} are answered alike by
+the class. It starts from the same encoded, engagement-filtered, per-respondent
+std-rescaled matrix $X$ of size $87\times 60$ (Section~3), with missing entries
+kept as NaN (\texttt{src/statement\_network.py}).
+
+\begin{enumerate}[nosep, leftmargin=1.5em]
+    \item \textbf{Nodes.} One node per statement (60 in total), annotated with its T/E/S/V
+    category and full text.
+    \item \textbf{Similarity.} For every pair of statements $(i,j)$ we compute the Spearman
+    rank correlation $r_{ij}$ between their two columns of $X$, using only the respondents who
+    answered both (pairwise-complete). Pairs with fewer than 15 overlapping respondents
+    (\texttt{MIN\_PERIODS = 15}) get no correlation. Spearman is used, rather than the cosine
+    similarity of the User--User network, because the responses are ordinal and here we measure
+    co-variation across respondents. It is computed on the \emph{rescaled} matrix because
+    otherwise ``extreme'' responders (who mark almost everything Strongly Agree/Disagree) push
+    every pair of columns towards the same corners and inflate the correlation between
+    otherwise unrelated statements.
+    \item \textbf{Edges.} An undirected edge $\{i,j\}$ is kept iff $|r_{ij}| \geq \tau = 0.30$
+    (\texttt{EDGE\_THRESHOLD}), with weight $w_{ij} = r_{ij}$ so that the sign is preserved
+    (positive = statements endorsed together, negative = opposing opinions).
+    \item \textbf{Metrics.} \emph{Degree} counts neighbours (unweighted).
+    \emph{Eigenvector centrality} is computed on $|w_{ij}|$, since it requires non-negative
+    weights (\texttt{max\_iter} = 1000). \emph{Betweenness} is computed on the distance
+    $d_{ij} = 1 - |r_{ij}|$, because NetworkX reads edge weights as traversal costs, and using
+    $r$ directly would make a strong tie look ``farther'' than a weak one. Connectivity
+    diagnostics (components, largest component, isolated statements) are also recorded, since
+    at higher thresholds statements can silently lose all their edges.
+\end{enumerate}
+
+\textbf{Threshold choice.} The cutoff $\tau$ controls how dense the network is:
+
+\begin{center}
+\small
+\begin{tabular}{cccc}
+\toprule
+$\tau$ & \textbf{Edges} & \textbf{Density} & \textbf{Negative edges} \\
+\midrule
+0.10 & 1{,}546 & 0.8734 & 31 \\
+0.20 & 1{,}211 & 0.6842 & 5 \\
+0.25 & 1{,}021 & 0.5768 & 3 \\
+\textbf{0.30} & \textbf{810} & \textbf{0.4576} & \textbf{0} \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+At $\tau = 0.10$ the graph is almost complete (87.3\% of all pairs), so it barely
+differentiates between statements. $\tau = 0.30$ gives a more selective network while still
+retaining one large connected structure, and was used as the final network. Note that this
+choice also removes every negative edge.
+
 \subsection{User--Statement Network}
 
 \begin{figure}[h]
@@ -250,6 +333,55 @@ Agreement Ratio (Raw Data)      & 542 & 0.396 & 0.243 & 87 / 87 \\
 \end{center}
 
 \subsection{Statement--Statement Network}
+
+\begin{figure}[ht]
+\centering
+\begin{minipage}[c]{0.53\textwidth}
+    \centering
+    \includegraphics[width=\linewidth]{../figures/statement_network.png}
+\end{minipage}\hfill
+\begin{minipage}[c]{0.45\textwidth}
+    \centering\small
+    \begin{tabular}{lc}
+    \toprule
+    \textbf{Metric} & \textbf{Value} \\
+    \midrule
+    Nodes / edges & 60 / 810 \\
+    Density & 0.4576 \\
+    Average degree & 27.00 \\
+    Pos.\ / neg.\ edges & 810 / 0 \\
+    Connected components & 4 \\
+    Largest component & 57 / 60 \\
+    Isolated nodes & E02, E03, E04 \\
+    \bottomrule
+    \end{tabular}
+
+    \vspace{0.9em}
+    \footnotesize
+    \begin{tabular}{ccc}
+    \toprule
+    \textbf{Degree} & \textbf{Eigenvector} & \textbf{Betweenness} \\
+    \midrule
+    S09 (45) & S09 (0.1993) & S15 (0.0479) \\
+    S15 (44) & V07 (0.1907) & V09 (0.0421) \\
+    S07 (43) & V14 (0.1845) & T07 (0.0374) \\
+    E11 (42) & S15 (0.1842) & S07 (0.0368) \\
+    E14 (42) & V15 (0.1814) & S13 (0.0362) \\
+    \bottomrule
+    \end{tabular}
+\end{minipage}
+\caption{Statement--Statement opinion network ($|r| \geq 0.30$). \textit{Left:} node colour =
+T/E/S/V category, node size $\propto$ degree, edge width $\propto |r|$; all edges are positive
+(green) since no negative correlation reaches the threshold. \textit{Right:} network summary and
+the top five statements under each centrality measure, ranked (value in brackets; the first
+letter of each ID is its category).}
+\label{fig:statement-network}
+\end{figure}
+
+Figure~\ref{fig:statement-network} shows that the network is dense (810 edges among 60
+statements) and dominated by one connected component, with E02, E03 and E04 left without
+edges. The three centrality measures single out different statements (S09, S15, V07 and T07
+recur), which Section~6.2 discusses.
 
 \subsection{User--Statement Network}
 
@@ -393,6 +525,50 @@ statements are where the most distinct dividing lines in class opinion are drawn
 
 \subsection{Statement--Statement Network}
 
+\textbf{A dense, uniformly positive structure.} At $|r| \geq 0.30$, 810 of the 1{,}770
+possible statement pairs (45.8\%) are linked (average degree 27 out of 59), and \emph{every}
+retained edge is positive. Answers to many different statements therefore move together across
+respondents, which points to substantial shared structure in the class's opinions rather than
+60 independent views. This does not mean the class never disagrees: weaker negative
+correlations exist (31 negative edges at $|r| \geq 0.10$, 5 at $0.20$, 3 at $0.25$), but none
+reaches the 0.30 threshold.
+
+\textbf{One broad component and three detached statements.} 57 of the 60 statements (95\%)
+lie in a single connected component, so the network is not split into separate, equally sized
+groups of statements. The remaining three are isolated, i.e.\ none correlates with any other
+statement at $|r| \geq 0.30$: E02 (written exams measure knowledge accurately), E03
+(compulsory attendance) and E04 (online learning complementing classroom teaching). These are
+exactly the three statements found to be the most contested in the User--Statement analysis
+(highest std, Section~5.3). This suggests that where the class divides on these Education
+issues is largely unrelated to how respondents answer the rest of the survey.
+
+\textbf{Hubs and bridges.} S09 (universities should promote an inclusive, respectful
+environment for differing viewpoints) has the highest degree (45 of a possible 59) and the
+highest eigenvector centrality (0.1993): it co-varies with many statements, and those are
+themselves well connected. S15 (public trust is essential for responsible adoption of
+emerging technologies) is the only statement in the top five on all three measures: second in
+degree (44), fourth in eigenvector centrality (0.1842) and first in betweenness (0.0479),
+making it both a hub and the strongest bridge between regions of the network. Degree and
+betweenness are not interchangeable: T07 (robots replacing humans in hazardous jobs) is
+outside the degree top five yet third in betweenness, so its importance comes from where it
+sits rather than from its number of links. That S09 is also one of the strongest consensus
+statements (Section~6.3) shows that centrality here reflects co-variation with other
+statements, not high average agreement.
+
+\textbf{Structure cuts across the survey's categories.} The top-ranked statements come from
+all four categories (S, E, V, T) rather than from one: for example, the Environment
+statements V07, V14 and V15 sit alongside the Society statements S09 and S15 among the most
+central nodes. Response patterns therefore link statements across the survey's own T/E/S/V
+boundaries. This is evidence of cross-category association in how respondents answered, not
+of the original categories being wrong.
+
+\textbf{Robustness and caveats.} S09, S15, V07, V14 and V15 repeatedly appear among the most
+central statements across the thresholds tried, so their prominence does not depend entirely
+on the single choice $\tau = 0.30$, although all findings remain conditional on it. The network describes
+associations between response patterns, not causal influence: a highly connected or
+high-betweenness statement is not necessarily one the class strongly agrees with, nor one that
+drives opinions on other issues.
+
 \subsection{User--Statement Network}
 The near-total density (98.8\%) combined with a positive mean edge weight ($+1.14$) shows the class
 leans broadly toward agreement across the survey, consistent with the 80\%/13\%/7\%
@@ -428,7 +604,7 @@ and polarization are measuring two different things.
 \midrule
 Shreyas Agarwal & User--User network: three-network framework (Directed/Mutual/Non-Mutual Top-8 sparsification), community detection, eigenvector and PageRank centrality, signed-network threshold calibration, topic-layer and alternative-metric comparisons, corresponding report sections. \\
 \addlinespace
-Name 2 & \\
+Sarah Roomi & Statement--Statement network: pairwise Spearman correlation matrix on the rescaled responses (\texttt{statement\_network.py}), thresholded signed/weighted edge construction ($|r| \geq 0.30$) with a threshold sweep (0.10--0.30), degree / eigenvector / betweenness centrality and connectivity diagnostics, force-directed visualization, corresponding report sections. \\
 \addlinespace
 Priyanka Agarwal & User--Statement network: bipartite graph construction (\texttt{user\_statement\_network.py}), response-weighted edge scheme, per-user/per-statement metrics, heatmap and full-network visualizations, corresponding report sections. \\
 \bottomrule
