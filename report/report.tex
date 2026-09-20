@@ -49,6 +49,7 @@
 \textbf{LinkedOut}
 
 \begin{itemize}[nosep]
+    \item Shreyas Agarwal (Roll No.\ 2024101118)
     \item Priyanka Agarwal (Roll No.\ 2024101016)
 \end{itemize}
 
@@ -62,16 +63,94 @@ Repository: \url{https://github.com/dawnbliss-coder/opinion-network-formation}
 % -----------------------------------------------------------------
 
 \subsection{Data Description}
+The dataset comprises survey responses from a class cohort regarding 60 Likert-scale
+statements spanning four key topics: Technology (T), Education (E), Society/Ethics (S),
+and Environment (V).
 
 \subsection{Encoding and Preprocessing}
+Standard deviation rescaling (without mean shift) was applied to the raw response matrix. This corrects for the difference between
+``extreme'' and ``mild'' responders without destroying the genuine uniform agreement signal present across the class. Cosine similarity was used
+as the primary metric on the rescaled matrix as, unlike full z-scoring, which collapses neutral opinions, it preserves directional agreement
+effectively.
 
 \subsection{Handling Missing Data and Data Quality}
+The initial dataset contained 96 respondents. Nine respondents with more than 50\%
+missing data (nodes 30, 39, 44, 60, 68, 73, 77, 78, 87) were dropped to ensure data
+quality, yielding a robust final cohort of \textbf{87 respondents}. To prevent highly
+skewed similarities based on only a handful of shared answers, a strict floor
+(\texttt{MIN\_OVERLAP = 5}) was applied to pairwise comparisons: any pairwise similarity
+computed from fewer than 5 jointly answered statements was discarded (\texttt{np.nan}).
 
 % -----------------------------------------------------------------
 \section{Pipeline Followed}
 % -----------------------------------------------------------------
 
 \subsection{User--User Network}
+
+\begin{figure}[h]
+\centering
+\begin{tikzpicture}[
+  block/.style={rectangle, draw, fill=gray!10, rounded corners, text width=2.15cm,
+                align=center, minimum height=1.15cm, font=\scriptsize},
+  arrow/.style={thick, -{Stealth[length=1.8mm]}}
+]
+% --- Row 1: shared preprocessing (data_prep.py) ---
+\node[block] (raw) {Raw responses\\($96\times 60$ Likert)};
+\node[block, right=0.3cm of raw] (encode) {Encode to\\$\{-2,\dots,2\}$,\\NaN if missing};
+\node[block, right=0.3cm of encode] (filter) {Drop resp.\ $<$50\%\\answered $\Rightarrow$\\87 respondents};
+\node[block, right=0.3cm of filter] (rescale) {Std-rescale\\per respondent\\(no mean shift)};
+
+% --- Row 2: User-User specific steps (user_user_network.py) ---
+\node[block, below=0.55cm of raw, xshift=1.05cm] (sim) {Cosine similarity\\matrix $\mathrm{sim}(i,j)$\\(MIN\_OVERLAP $=5$)};
+\node[block, right=0.3cm of sim] (sparsify) {Top-$k{=}8$\\sparsification:\\Directed / Mutual /\\Non-Mutual};
+\node[block, right=0.3cm of sparsify] (community) {communities\\+ eigenvector /\\PageRank centrality};
+\node[block, right=0.3cm of community] (viz) {Force-directed\\visualization\\(spring layout)};
+
+\draw[arrow] (raw) -- (encode);
+\draw[arrow] (encode) -- (filter);
+\draw[arrow] (filter) -- (rescale);
+\draw[arrow] (rescale.south) -- ++(0,-0.15) -| (sim.north);
+\draw[arrow] (sim) -- (sparsify);
+\draw[arrow] (sparsify) -- (community);
+\draw[arrow] (community) -- (viz);
+\end{tikzpicture}
+\caption{User--User network construction pipeline.}
+\label{fig:user-user-pipeline}
+\end{figure}
+
+Because survey similarities naturally vary in strength and reciprocity, the User--User
+network was modeled using a deliberately designed \textbf{three-network framework}.
+Instead of treating one graph as universally ``correct,'' three purpose-built views of
+the same underlying similarity matrix were generated, each using \textbf{top-k
+sparsification (k = 8)}, chosen because it produces a stable, fully connected base
+structure in the directed case without artificially isolating nodes.
+
+\textbf{Directed Top-8 Network (Primary Network).}
+Edges are directed from user A to user B if B is in A's top 8 most similar peers. This
+network acts as the base representation: cosine similarity's asymmetric top-k membership
+is a genuine, informative feature of the data, capturing ``who looks up to whom'' in
+opinion space. It preserves the full 694 edges and is used for PageRank, in/out-strength,
+and connected-component metrics.
+
+\textbf{Mutual Top-8 Network (High-Confidence Projection).}
+Edges exist only if A and B mutually rank each other in their top 8. This projection
+isolates reciprocal agreement, purposely shattering the network to reveal the deeply
+connected ``consensus core'' (the largest component) versus the fragmented periphery.
+
+\textbf{Non-Mutual Undirected Top-8 Network (Comparison Baseline).}
+An edge exists if \emph{either} A or B is in the other's top 8. This network is used
+specifically for cross-category and engagement-weighted comparisons. Enforcing mutuality
+on thinner data subsets (like specific topics) fragments the graph unevenly, so the non-mutual approach guarantees a consistently
+connected structure necessary for fair modularity and community comparisons.
+
+\textit{Methodological implementations:} Louvain community detection was used; for the primary directed graph, edge weights for
+reciprocal pairs were summed (weight-summed symmetrization) rather than dropped,
+preserving the $\sim$78\% of network structure that is inherently one-directional.
+NetworkX's Eigenvector Centrality \texttt{max\_iter} was raised to 1000 to ensure
+convergence on sparse structures. For the signed network, raw similarity is heavily
+right-skewed, so thresholds were dynamically calibrated to the extreme tails of the
+distribution: positive threshold = 0.9 (exceptional similarity) and negative threshold
+= $-0.1$ (exceptional dissimilarity).
 
 \subsection{Statement--Statement Network}
 
@@ -125,6 +204,50 @@ Strongly Agree/Disagree only  & 2{,}349 & 45.0\% \\
 % -----------------------------------------------------------------
 
 \subsection{User--User Network}
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=0.47\textwidth]{../figures/user_user_directed.png}\hfill
+    \includegraphics[width=0.47\textwidth]{../figures/user_user_mutual.png}
+    \caption{\textit{Left:} Full Directed graph of top 8 similarity scores per user based on cosine similarity. 
+    \textit{Right:} Full graph of mutual top 8 similarity scores per user based on cosine similarity.}
+    \label{fig:user-statement}
+\end{figure}
+
+\textit{Topic-Specific Multiplex Layers.} To analyze how opinions
+cluster by topic without artificial fragmentation, the non-mutual sparsification was
+applied to the four distinct statement categories.
+
+\begin{center}
+\small
+\begin{tabular}{lcccc}
+\toprule
+\textbf{Category} & \textbf{Edges} & \textbf{Modularity} & \textbf{Communities} & \textbf{Largest Component} \\
+\midrule
+E (Education)     & 519 & 0.370 & 7 & 86 / 87 \\
+S (Society/Ethics) & 621 & 0.313 & 4 & 87 / 87 \\
+T (Technology)    & 548 & 0.377 & 5 & 87 / 87 \\
+V (Environment)   & 609 & 0.299 & 7 & 86 / 87 \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\textit{User-User Response Similarity Networks (Non-Mutual).} To ensure findings
+were robust regardless of the specific similarity metric, the baseline cosine similarity graph was compared
+against alternative network calculations.
+
+\begin{center}
+\small
+\begin{tabular}{lcccc}
+\toprule
+\textbf{Metric} & \textbf{Edges} & \textbf{Modularity} & \textbf{Avg. Clustering} & \textbf{Largest CC} \\
+\midrule
+Cosine (Weighted)  & 625 & 0.242 & 0.111   & 87 / 87 \\
+Pearson (Unweighted)            & 559 & 0.291 & 0.196 & 87 / 87 \\
+Spearman (Unweighted)           & 517 & 0.302 & 0.148 & 87 / 87 \\
+Agreement Ratio (Raw Data)      & 542 & 0.396 & 0.243 & 87 / 87 \\
+\bottomrule
+\end{tabular}
+\end{center}
 
 \subsection{Statement--Statement Network}
 
@@ -202,6 +325,41 @@ polarizing ones come from the Education category.
 
 \subsection{User--User Network}
 
+\textbf{A dominant consensus core.} A small, highly representative cluster of
+respondents acts as the ideological center of the class. Respondents 81, 105, 110, 114,
+and 67 consistently top the charts across both in-strength (most nominated as similar)
+and PageRank in the Directed network. Nodes 81, 105, 94, 67, and 110 also top eigenvector
+centrality in the Mutual network. They represent the ``class average,'' acting as
+gravitational hubs in the opinion space.
+
+\textbf{Hub-and-spoke agreement (low reciprocity).} Similarity in the class is
+fundamentally directional. Only 21.9\% of directed edges are reciprocated. While the
+entire class is weakly connected (100\% WCC), the largest strongly connected component
+(SCC) is just 39\% of nodes (34 nodes). Most students ``point to'' the consensus core,
+but the core does not point back. When mutuality is strictly enforced, the network
+shatters into 49 micro-communities with 57 unconnected nodes, showing that broad opinion
+camps are held together by mostly one-directional similarity.
+
+\textbf{Polarization exists only at the extreme margins.} Using the strictly calibrated
+signed network (thresholds 0.9 and $-0.1$), the extreme tails of agreement and
+disagreement are relatively balanced but incredibly sparse: 60 positive edges vs.\ 47
+negative edges out of thousands of possible pairs. Deep ideological opposites do exist
+in the class, but they are rare, disagreement overall is moderate, there are no two big heavily polarized opinion groups.
+
+\textbf{Opinion outliers.} Looking at bottom out-strength scores in the Directed graph
+identifies individuals whose closest peers still aren't very
+similar to them. Respondent 120 (out-strength 0.23) is a massive anomaly, scoring an
+order of magnitude lower than the rest of the cohort (the next lowest is node 119 at
+3.00). This respondent's response pattern is highly idiosyncratic compared to the
+broader class consensus.
+
+\textbf{Topic-driven factionalism.} While the class shows general consensus,
+factionalism spikes depending on the subject matter. Topics related to Technology
+(modularity 0.377, 5 communities) and Education (modularity 0.370, 7 communities)
+display significantly higher modularity -- meaning tighter, more distinct echo chambers
+-- than Environment (0.299) or Society (0.313). This suggests that Tech and Education
+statements are where the most distinct dividing lines in class opinion are drawn.
+
 \subsection{Statement--Statement Network}
 
 \subsection{User--Statement Network}
@@ -213,7 +371,10 @@ answers were Agree or Strongly Agree.
 At the respondent level, mean\_response isolates a small set of genuine outliers from the agreeable
 majority. Respondent 120 has the lowest mean\_response ($-0.21$), the only respondent whose average
 stance falls on the disagreement side of neutral despite answering 56 of 60 statements. That looks
-like a real dissenting voice rather than a low-engagement artifact.
+like a real dissenting voice rather than a low-engagement artifact -- notably, this is the same
+respondent (120) flagged as the primary out-strength outlier in the User--User network
+(Section~6.1), corroborating across networks that respondent 120 is a genuine opinion outlier rather
+than an artifact of either method.
 
 At the statement level, std\_response identifies the Education-category statements E02, E03, and E04
 as the most contested in the entire survey, while E15 and V13 are the strongest consensus statements.
@@ -234,7 +395,7 @@ and polarization are measuring two different things.
 \toprule
 \textbf{Member} & \textbf{Contribution} \\
 \midrule
-Name 1 & \\
+Shreyas Agarwal & User--User network: three-network framework (Directed/Mutual/Non-Mutual Top-8 sparsification), community detection, eigenvector and PageRank centrality, signed-network threshold calibration, topic-layer and alternative-metric comparisons, corresponding report sections. \\
 \addlinespace
 Name 2 & \\
 \addlinespace
