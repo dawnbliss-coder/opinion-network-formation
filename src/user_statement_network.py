@@ -97,21 +97,17 @@ def compute_user_metrics(response_matrix_raw: pd.DataFrame) -> pd.DataFrame:
     Per-respondent metrics, computed directly off the response matrix
     (equivalent to, but simpler than, walking bipartite edges):
       - degree: number of statements answered
-      - strength: sum of edge weights (net sentiment; sign shows overall
-        agree/disagree lean, magnitude shows how strongly)
-      - mean_response: strength / degree (average stance, comparable across
-        respondents regardless of how many statements they answered)
+      - mean_response: average stance (comparable across respondents
+        regardless of how many statements they answered)
       - mean_abs_response: average |weight| ("intensity" - how strongly a
         respondent tends to react, independent of direction)
     """
     degree = response_matrix_raw.notna().sum(axis=1)
-    strength = response_matrix_raw.sum(axis=1, skipna=True)
-    mean_response = strength / degree
+    mean_response = response_matrix_raw.sum(axis=1, skipna=True) / degree
     mean_abs_response = response_matrix_raw.abs().mean(axis=1, skipna=True)
 
     df = pd.DataFrame({
         "degree": degree,
-        "strength": strength,
         "mean_response": mean_response,
         "mean_abs_response": mean_abs_response,
     })
@@ -127,19 +123,15 @@ def compute_statement_metrics(response_matrix_raw: pd.DataFrame, statement_meta:
         near 0 = split/neutral)
       - std_response: spread of responses - low std + high |mean| =
         consensus statement; high std = polarizing/contested statement
-      - pct_strong: fraction of responses that were Strongly Agree/Disagree
-        (|weight| == 2), a crude "intensity" measure per statement
     """
     degree = response_matrix_raw.notna().sum(axis=0)
     mean_response = response_matrix_raw.mean(axis=0, skipna=True)
     std_response = response_matrix_raw.std(axis=0, skipna=True)
-    pct_strong = (response_matrix_raw.abs() == 2).sum(axis=0) / degree
 
     df = pd.DataFrame({
         "degree": degree,
         "mean_response": mean_response,
         "std_response": std_response,
-        "pct_strong": pct_strong,
     })
     df["category"] = statement_meta.reindex(df.index)["category"]
     return df.sort_values("std_response", ascending=False)
@@ -153,13 +145,6 @@ def network_summary(G: nx.Graph, response_matrix_raw: pd.DataFrame) -> dict:
     n_edges = G.number_of_edges()
 
     weights = np.array([d["weight"] for _, _, d in G.edges(data=True)])
-    sign_counts = {
-        "strongly_agree (+2)": int((weights == 2).sum()),
-        "agree (+1)": int((weights == 1).sum()),
-        "neutral (0)": int((weights == 0).sum()),
-        "disagree (-1)": int((weights == -1).sum()),
-        "strongly_disagree (-2)": int((weights == -2).sum()),
-    }
 
     return {
         "n_users": n_users,
@@ -168,7 +153,6 @@ def network_summary(G: nx.Graph, response_matrix_raw: pd.DataFrame) -> dict:
         "n_edges": n_edges,
         "density": n_edges / n_possible if n_possible else 0,
         "mean_weight": float(weights.mean()) if len(weights) else np.nan,
-        "sign_counts": sign_counts,
         "pct_positive": float((weights > 0).mean()) if len(weights) else np.nan,
         "pct_negative": float((weights < 0).mean()) if len(weights) else np.nan,
         "pct_neutral": float((weights == 0).mean()) if len(weights) else np.nan,
@@ -218,7 +202,6 @@ def print_report(summary: dict, user_metrics: pd.DataFrame, statement_metrics: p
     print(f"Mean edge weight: {summary['mean_weight']:.3f}")
     print(f"Sign split: {summary['pct_positive']:.1%} positive, "
           f"{summary['pct_neutral']:.1%} neutral, {summary['pct_negative']:.1%} negative")
-    print("Response breakdown:", summary["sign_counts"])
     print()
 
     print(f"TOP {top_n} MOST AGREEABLE USERS (highest mean response)")
